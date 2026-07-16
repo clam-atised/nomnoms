@@ -1,0 +1,74 @@
+{
+  "folders": [
+    {
+      "id": "seed_folder_malaysian_cuisine",
+      "name": "Malaysian Cuisine",
+      "color": "#edd312"
+    }
+  ],
+  "recipes": [
+    {
+      "id": "seed_recipe_nasi_lemak",
+      "name": "Nasi Lemak",
+      "folderId": "seed_folder_malaysian_cuisine",
+      "preparationMinutes": 30,
+      "timesOfDay": ["morning"],
+      "daysOfWeek": [],
+      "link": "https://nomadette.com/nasi-lemak/",
+      "instructions": "Rinse the rice, then place it in a rice cooker with all the ingredients. Cook as you normally would. Once done, let it rest for 10 minutes, remove the aromatics, and fluff gently.\n\nBlend the chilies, onions, and garlic into a smooth paste. Heat cooking oil in a pan and sauté the paste until fragrant. Add the tamarind water, palm sugar, and salt, then simmer on low heat until the sauce thickens and the oil separates.",
+      "ingredients": [
+        { "quantity": 2, "unit": "cup", "name": "basmati rice" },
+        { "quantity": 400, "unit": "ml", "name": "coconut milk" },
+        { "quantity": 1.5, "unit": "cup", "name": "water" },
+        { "quantity": 2, "unit": null, "name": "pandan" },
+        { "quantity": 1, "unit": null, "name": "lemongrass" },
+        { "quantity": 1, "unit": null, "name": "ginger" },
+        { "quantity": 0.5, "unit": "tsp", "name": "salt" },
+        { "quantity": 1, "unit": "cup", "name": "dried chilli" },
+        { "quantity": 1, "unit": null, "name": "onion" },
+        { "quantity": 3, "unit": null, "name": "garlic" },
+        { "quantity": 1, "unit": "tbsp", "name": "tamarind paste" },
+        { "quantity": 1, "unit": "tbsp", "name": "palm sugar" },
+        { "quantity": 0.5, "unit": "tsp", "name": "salt" }
+      ]
+    },
+    {
+      "id": "seed_recipe_tosai",
+      "name": "Tosai (Dosa)",
+      "folderId": "seed_folder_malaysian_cuisine",
+      "preparationMinutes": 15,
+      "timesOfDay": ["morning", "noon"],
+      "daysOfWeek": [],
+      "link": "https://www.indianhealthyrecipes.com/dosa-recipe-dosa-batter/",
+      "instructions": "Soak: Wash the rice, urad dhal, and fenugreek seeds thoroughly. Soak them in a large bowl of water for at least 6 hours.\n\nBlend: Drain the soaked ingredients. Blend them in a high-speed blender or grinder in batches with the cooked rice and water, until you get a smooth, thick, and pourable batter.\n\nFerment: Pour the blended batter into a large bowl (it will expand). Add salt, mix well with clean hands (the warmth helps), and let it ferment overnight in a warm spot for 8–12 hours.\n\nCook: Heat a flat non-stick pan or tawa over medium heat. Lightly brush it with oil or ghee. Pour a ladle of batter in the center and quickly spread it outwards in a thin, circular motion.\n\nCrisp: Drizzle a few drops of ghee or oil around the edges. Cover with a lid and let it cook for 1–2 minutes until the edges are golden and crisp. Roll it up and serve hot!",
+      "ingredients": [
+        { "quantity": 3, "unit": "cup", "name": "raw rice" },
+        { "quantity": 1, "unit": "cup", "name": "black lentils" },
+        { "quantity": 1, "unit": "tbsp", "name": "fenugreek seeds" },
+        { "quantity": 1, "unit": "cup", "name": "cooked rice" },
+        { "quantity": 800, "unit": "ml", "name": "water" },
+        { "quantity": 1, "unit": "tbsp", "name": "ghee" },
+        { "quantity": 1, "unit": "tsp", "name": "salt" }
+      ]
+    },
+    {
+      "id": "seed_recipe_wat_tan_hor",
+      "name": "Wat Tan Hor (Silky Egg Gravy Flat Noodles)",
+      "folderId": "seed_folder_malaysian_cuisine",
+      "preparationMinutes": 20,
+      "timesOfDay": ["noon", "night"],
+      "daysOfWeek": [],
+      "link": "https://www.ajinomoto.com.my/recipes/wat-tan-hor-set",
+      "instructions": "Toss the noodles with 1 tbsp of dark soy sauce for color. Stir-fry in a hot wok over high heat until slightly charred, then set aside on a plate.\n\nIn the same wok, stir-fry the garlic, chicken, and prawns until cooked. Add the chicken broth and bring to a boil.\n\nAdd the choy sum, then stir in your cornstarch slurry until the gravy is nicely thickened.\n\nTurn off the heat. Slowly pour in the beaten eggs in a circular motion and stir gently to create \"ribbons.\"\n\nPour the hot, silky gravy directly over your prepared noodles.",
+      "ingredients": [
+        { "quantity": 400, "unit": "g", "name": "flat rice noodles" },
+        { "quantity": 100, "unit": "g", "name": "chicken" },
+        { "quantity": 1, "unit": null, "name": "bok choy" },
+        { "quantity": 3, "unit": null, "name": "garlic" },
+        { "quantity": 2, "unit": null, "name": "eggs" },
+        { "quantity": 3, "unit": "cup", "name": "chicken broth" },
+        { "quantity": 1, "unit": "tbsp", "name": "cornstarch" }
+      ]
+    }
+  ]
+}
