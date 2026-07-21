@@ -5,7 +5,7 @@ import 'package:nomnom/data/recipe_store.dart';
 import 'package:nomnom/theme/app_colors.dart';
 import 'package:nomnom/widgets/settings_dialog.dart';
 
-enum CalculateMode { cost, calories }
+enum CalculateMode { cost, calories, protein }
 
 class CalculateCostPage extends StatefulWidget {
   const CalculateCostPage({super.key});
@@ -20,7 +20,31 @@ class _CalculateCostPageState extends State<CalculateCostPage> {
   String get _modeLabel => switch (_mode) {
         CalculateMode.cost => 'cost',
         CalculateMode.calories => 'calories',
+        CalculateMode.protein => 'protein',
       };
+
+  String get _hintText => switch (_mode) {
+        CalculateMode.cost => '0',
+        CalculateMode.calories => 'calories',
+        CalculateMode.protein => 'protein',
+      };
+
+  double? _valueFor(RecipeStore store, String name) => switch (_mode) {
+        CalculateMode.cost => store.costFor(name),
+        CalculateMode.calories => store.calorieFor(name),
+        CalculateMode.protein => store.proteinFor(name),
+      };
+
+  void _setValue(RecipeStore store, String name, double? value) {
+    switch (_mode) {
+      case CalculateMode.cost:
+        store.setIngredientCost(name, value);
+      case CalculateMode.calories:
+        store.setIngredientCalorie(name, value);
+      case CalculateMode.protein:
+        store.setIngredientProtein(name, value);
+    }
+  }
 
   Future<void> _showInfoDialog(BuildContext context) async {
     await showDialog<void>(
@@ -51,16 +75,14 @@ class _CalculateCostPageState extends State<CalculateCostPage> {
     RecipeStore store,
     String name,
   ) async {
-    final existing = _mode == CalculateMode.cost
-        ? store.costFor(name)
-        : store.calorieFor(name);
+    final existing = _valueFor(store, name);
 
     final result = await showDialog<String>(
       context: context,
       builder: (context) => _ValueEditDialog(
         ingredientName: name,
         initialText: existing == null ? '' : _formatValue(existing),
-        hintText: _mode == CalculateMode.cost ? 'price' : 'calories',
+        hintText: _hintText,
       ),
     );
 
@@ -68,21 +90,13 @@ class _CalculateCostPageState extends State<CalculateCostPage> {
 
     final trimmed = result.trim();
     if (trimmed.isEmpty) {
-      if (_mode == CalculateMode.cost) {
-        store.setIngredientCost(name, null);
-      } else {
-        store.setIngredientCalorie(name, null);
-      }
+      _setValue(store, name, null);
       return;
     }
 
     final value = double.tryParse(trimmed);
     if (value == null || value < 0) return;
-    if (_mode == CalculateMode.cost) {
-      store.setIngredientCost(name, value);
-    } else {
-      store.setIngredientCalorie(name, value);
-    }
+    _setValue(store, name, value);
   }
 
   static String _formatValue(double value) {
@@ -145,6 +159,13 @@ class _CalculateCostPageState extends State<CalculateCostPage> {
                             style: GoogleFonts.antic(color: nomnomTheme(context).text),
                           ),
                         ),
+                        PopupMenuItem(
+                          value: CalculateMode.protein,
+                          child: Text(
+                            'protein',
+                            style: GoogleFonts.antic(color: nomnomTheme(context).text),
+                          ),
+                        ),
                       ],
                       child: Row(
                         children: [
@@ -203,17 +224,9 @@ class _CalculateCostPageState extends State<CalculateCostPage> {
                       itemCount: names.length,
                       itemBuilder: (context, index) {
                         final name = names[index];
-                        final String valueLabel;
-                        if (_mode == CalculateMode.cost) {
-                          final cost = store.costFor(name);
-                          valueLabel =
-                              cost == null ? 'price' : _formatValue(cost);
-                        } else {
-                          final calories = store.calorieFor(name);
-                          valueLabel = calories == null
-                              ? '0'
-                              : _formatValue(calories);
-                        }
+                        final value = _valueFor(store, name);
+                        final valueLabel =
+                            value == null ? '0' : _formatValue(value);
 
                         return Row(
                           children: [

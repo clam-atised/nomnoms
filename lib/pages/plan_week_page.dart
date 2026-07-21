@@ -192,7 +192,7 @@ class _PlanWeekPageState extends State<PlanWeekPage> {
 
   List<Widget> _buildPlanEstimates(BuildContext context) {
     final settings = AppSettingsScope.of(context);
-    if (!settings.showCost && !settings.showCalorie) {
+    if (!settings.showCost && !settings.showCalorie && !settings.showProtein) {
       return const [];
     }
 
@@ -239,6 +239,25 @@ class _PlanWeekPageState extends State<PlanWeekPage> {
           value: RecipeStore.formatEstimate(estimate.total),
           showInfo: !estimate.isComplete,
           infoMessage: RecipeStore.calorieEstimateInfoMessage,
+          labelStyle: labelStyle,
+          valueStyle: valueStyle,
+        ),
+      );
+    }
+    if (settings.showProtein) {
+      if (widgets.isNotEmpty) {
+        widgets.add(const SizedBox(width: 12));
+      }
+      final estimate = store.estimateForRecipes(
+        recipes,
+        estimateFor: store.proteinEstimateFor,
+      );
+      widgets.add(
+        _PlanEstimateLabel(
+          label: 'Protein:',
+          value: RecipeStore.formatEstimate(estimate.total),
+          showInfo: false,
+          infoMessage: '',
           labelStyle: labelStyle,
           valueStyle: valueStyle,
         ),

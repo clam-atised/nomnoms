@@ -8,6 +8,7 @@ abstract final class HiveBoxes {
   static const recipes = 'recipes';
   static const ingredientCosts = 'ingredient_costs';
   static const ingredientCalories = 'ingredient_calories';
+  static const ingredientProteins = 'ingredient_proteins';
   static const meta = 'meta';
 
   static const metaNextRecipeId = 'nextRecipeId';
@@ -15,6 +16,8 @@ abstract final class HiveBoxes {
   static const metaNightMode = 'nightMode';
   static const metaShowCost = 'showCost';
   static const metaShowCalorie = 'showCalorie';
+  static const metaShowProtein = 'showProtein';
+  static const metaMeasurementSystem = 'measurementSystem';
   static const metaSeedRecipesV1 = 'seedRecipesV1';
   static const metaSeedRecipesV2 = 'seedRecipesV2';
   static const metaSeedRecipesV3 = 'seedRecipesV3';
@@ -36,6 +39,7 @@ abstract final class HiveBoxes {
       Hive.openBox<Recipe>(recipes),
       Hive.openBox<double>(ingredientCosts),
       Hive.openBox<double>(ingredientCalories),
+      Hive.openBox<double>(ingredientProteins),
       Hive.openBox(meta),
     ]);
 
@@ -51,6 +55,8 @@ abstract final class HiveBoxes {
       metaNightMode: false,
       metaShowCost: false,
       metaShowCalorie: false,
+      metaShowProtein: false,
+      metaMeasurementSystem: MeasurementSystem.metric.name,
     };
 
     for (final entry in defaults.entries) {
@@ -70,6 +76,9 @@ abstract final class HiveBoxes {
 
   static Box<double> get ingredientCaloriesBox =>
       Hive.box<double>(ingredientCalories);
+
+  static Box<double> get ingredientProteinsBox =>
+      Hive.box<double>(ingredientProteins);
 
   static Box get metaBox => Hive.box(meta);
 }

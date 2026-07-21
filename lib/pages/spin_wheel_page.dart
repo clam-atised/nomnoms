@@ -22,7 +22,8 @@ class SpinWheelPage extends StatefulWidget {
   State<SpinWheelPage> createState() => _SpinWheelPageState();
 }
 
-class _SpinWheelPageState extends State<SpinWheelPage> {
+class _SpinWheelPageState extends State<SpinWheelPage>
+    with SingleTickerProviderStateMixin {
   int _folderIndex = 0;
   bool _didInitFolder = false;
   final List<PlanCriterion> _criteria = [];
@@ -30,6 +31,16 @@ class _SpinWheelPageState extends State<SpinWheelPage> {
   bool _isSpinning = false;
   int? _pendingIndex;
   List<Recipe> _spinRecipes = [];
+  late final AnimationController _hintBlinkController;
+
+  @override
+  void initState() {
+    super.initState();
+    _hintBlinkController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+  }
 
   @override
   void didChangeDependencies() {
@@ -42,6 +53,7 @@ class _SpinWheelPageState extends State<SpinWheelPage> {
 
   @override
   void dispose() {
+    _hintBlinkController.dispose();
     _selectedController.close();
     super.dispose();
   }
@@ -100,6 +112,7 @@ class _SpinWheelPageState extends State<SpinWheelPage> {
         final colors = nomnomTheme(context);
         final costEstimate = store.costEstimateFor(recipe);
         final calorieEstimate = store.calorieEstimateFor(recipe);
+        final proteinEstimate = store.proteinEstimateFor(recipe);
         final labelStyle = GoogleFonts.antic(
           color: colors.text,
           fontSize: 16,
@@ -160,6 +173,18 @@ class _SpinWheelPageState extends State<SpinWheelPage> {
                   value: RecipeStore.formatEstimate(calorieEstimate.total),
                   showInfo: !calorieEstimate.isComplete,
                   infoMessage: RecipeStore.calorieEstimateInfoMessage,
+                  labelStyle: labelStyle,
+                  valueStyle: valueStyle,
+                  iconColor: colors.text,
+                ),
+              ],
+              if (settings.showProtein) ...[
+                const SizedBox(height: 8),
+                _EstimateRow(
+                  label: 'Protein',
+                  value: RecipeStore.formatEstimate(proteinEstimate.total),
+                  showInfo: false,
+                  infoMessage: '',
                   labelStyle: labelStyle,
                   valueStyle: valueStyle,
                   iconColor: colors.text,
@@ -284,45 +309,69 @@ class _SpinWheelPageState extends State<SpinWheelPage> {
                           ),
                         ),
                       )
-                    : GestureDetector(
-                        onTap: () => _spin(wheelRecipes),
-                        child: FortuneWheel(
-                          selected: _selectedController.stream,
-                          animateFirst: false,
-                          onAnimationEnd: _onSpinComplete,
-                          indicators: [
-                            FortuneIndicator(
-                              alignment: Alignment.topCenter,
-                              child: TriangleIndicator(
-                                color: nomnomTheme(context).text,
-                              ),
-                            ),
-                          ],
-                          items: [
-                            for (var i = 0; i < wheelRecipes.length; i++)
-                              FortuneItem(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(8),
+                    : Column(
+                        children: [
+                          if (!_isSpinning)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8, bottom: 12),
+                              child: FadeTransition(
+                                opacity: _hintBlinkController,
+                                child: Center(
                                   child: Text(
-                                    wheelRecipes[i].name,
+                                    'tap on wheel to spin',
+                                    textAlign: TextAlign.center,
                                     style: GoogleFonts.antic(
-                                      color: i.isEven
-                                          ? Colors.white
-                                          : nomnomTheme(context).text,
-                                      fontSize: 14,
+                                      color: nomnomTheme(context).text,
+                                      fontSize: 18,
                                     ),
                                   ),
                                 ),
-                                style: FortuneItemStyle(
-                                  color: i.isEven
-                                      ? folder.color
-                                      : _lightTint(folder.color),
-                                  borderColor: nomnomTheme(context).background,
-                                  borderWidth: 2,
-                                ),
                               ),
-                          ],
-                        ),
+                            ),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => _spin(wheelRecipes),
+                              child: FortuneWheel(
+                                selected: _selectedController.stream,
+                                animateFirst: false,
+                                onAnimationEnd: _onSpinComplete,
+                                indicators: [
+                                  FortuneIndicator(
+                                    alignment: Alignment.topCenter,
+                                    child: TriangleIndicator(
+                                      color: nomnomTheme(context).text,
+                                    ),
+                                  ),
+                                ],
+                                items: [
+                                  for (var i = 0; i < wheelRecipes.length; i++)
+                                    FortuneItem(
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(8),
+                                        child: Text(
+                                          wheelRecipes[i].name,
+                                          style: GoogleFonts.antic(
+                                            color: i.isEven
+                                                ? Colors.white
+                                                : nomnomTheme(context).text,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ),
+                                      style: FortuneItemStyle(
+                                        color: i.isEven
+                                            ? folder.color
+                                            : _lightTint(folder.color),
+                                        borderColor:
+                                            nomnomTheme(context).background,
+                                        borderWidth: 2,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
               ),
             ),

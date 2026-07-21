@@ -26,6 +26,83 @@ void main() {
       );
       expect(ingredient.label, '1 1/4 cup milk');
     });
+
+    test('formats eighth cup unit', () {
+      const ingredient = Ingredient(
+        quantity: 1,
+        name: 'oil',
+        unit: IngredientUnit.eighthCup,
+      );
+      expect(ingredient.label, '1 1/8 cup oil');
+    });
+
+    test('formats third cup unit', () {
+      const ingredient = Ingredient(
+        quantity: 1,
+        name: 'sugar',
+        unit: IngredientUnit.thirdCup,
+      );
+      expect(ingredient.label, '1 1/3 cup sugar');
+    });
+
+    test('formats half cup unit', () {
+      const ingredient = Ingredient(
+        quantity: 1,
+        name: 'rice',
+        unit: IngredientUnit.halfCup,
+      );
+      expect(ingredient.label, '1 1/2 cup rice');
+    });
+  });
+
+  group('Ingredient displayLabel', () {
+    test('metric matches label', () {
+      const ingredient = Ingredient(
+        quantity: 400,
+        name: 'flat rice noodles',
+        unit: IngredientUnit.g,
+      );
+      expect(
+        ingredient.displayLabel(MeasurementSystem.metric),
+        '400 g flat rice noodles',
+      );
+    });
+
+    test('custom converts g to ounces with full text', () {
+      const ingredient = Ingredient(
+        quantity: 400,
+        name: 'flat rice noodles',
+        unit: IngredientUnit.g,
+      );
+      expect(
+        ingredient.displayLabel(MeasurementSystem.custom),
+        '14 ounces flat rice noodles',
+      );
+    });
+
+    test('custom converts ml to fluid ounces with full text', () {
+      const ingredient = Ingredient(
+        quantity: 100,
+        name: 'water',
+        unit: IngredientUnit.ml,
+      );
+      expect(
+        ingredient.displayLabel(MeasurementSystem.custom),
+        '3.4 fluid ounces water',
+      );
+    });
+
+    test('custom leaves cup units unchanged', () {
+      const ingredient = Ingredient(
+        quantity: 2,
+        name: 'basmati rice',
+        unit: IngredientUnit.cup,
+      );
+      expect(
+        ingredient.displayLabel(MeasurementSystem.custom),
+        '2 cup basmati rice',
+      );
+    });
   });
 
   group('RecipeStore ingredient costs', () {
@@ -92,17 +169,32 @@ void main() {
       expect(store.calorieFor('tomatoes'), isNull);
     });
 
-    test('cost and calorie values are independent', () {
+    test('setIngredientProtein stores and clears values', () {
+      final store = storeWithRecipes();
+      expect(store.proteinFor('Tomatoes'), isNull);
+
+      store.setIngredientProtein('Tomatoes', 3.5);
+      expect(store.proteinFor(' tomatoes '), 3.5);
+      expect(store.proteinFor('TOMATOES'), 3.5);
+
+      store.setIngredientProtein('tomatoes', null);
+      expect(store.proteinFor('tomatoes'), isNull);
+    });
+
+    test('cost, calorie, and protein values are independent', () {
       final store = storeWithRecipes();
       store.setIngredientCost('Tomatoes', 1.2);
       store.setIngredientCalorie('Tomatoes', 45);
+      store.setIngredientProtein('Tomatoes', 3.5);
 
       expect(store.costFor('Tomatoes'), 1.2);
       expect(store.calorieFor('Tomatoes'), 45);
+      expect(store.proteinFor('Tomatoes'), 3.5);
 
       store.setIngredientCost('Tomatoes', null);
       expect(store.costFor('Tomatoes'), isNull);
       expect(store.calorieFor('Tomatoes'), 45);
+      expect(store.proteinFor('Tomatoes'), 3.5);
     });
   });
 
@@ -159,6 +251,25 @@ void main() {
       expect(estimate.isComplete, isFalse);
     });
 
+    test('proteinEstimateFor sums quantity times stored protein', () {
+      final store = RecipeStore();
+      store.setIngredientProtein(' tomatoes ', 2);
+      store.setIngredientProtein('SALT', 0);
+
+      final estimate = store.proteinEstimateFor(soupRecipe());
+      expect(estimate.total, 4);
+      expect(estimate.isComplete, isTrue);
+    });
+
+    test('proteinEstimateFor skips missing values and stays complete', () {
+      final store = RecipeStore();
+      store.setIngredientProtein('Tomatoes', 2);
+
+      final estimate = store.proteinEstimateFor(soupRecipe());
+      expect(estimate.total, 4);
+      expect(estimate.isComplete, isTrue);
+    });
+
     test('empty ingredient list is complete with zero total', () {
       final store = RecipeStore();
       final recipe = Recipe(
@@ -172,10 +283,13 @@ void main() {
 
       final cost = store.costEstimateFor(recipe);
       final calories = store.calorieEstimateFor(recipe);
+      final protein = store.proteinEstimateFor(recipe);
       expect(cost.total, 0);
       expect(cost.isComplete, isTrue);
       expect(calories.total, 0);
       expect(calories.isComplete, isTrue);
+      expect(protein.total, 0);
+      expect(protein.isComplete, isTrue);
     });
 
     test('formatEstimate omits decimals for whole numbers', () {
@@ -191,12 +305,13 @@ void main() {
       expect(RecipeStore.formatEstimate(1500.5), '1.5k');
     });
 
-    test('estimateForRecipes sums costs and calories', () {
+    test('estimateForRecipes sums costs, calories, and protein', () {
       final store = RecipeStore();
       store.setIngredientCost('Tomatoes', 1.5);
       store.setIngredientCost('Salt', 0.25);
       store.setIngredientCalorie('Tomatoes', 20);
       store.setIngredientCalorie('Salt', 0);
+      store.setIngredientProtein('Tomatoes', 2);
 
       final soup = soupRecipe();
       final salad = Recipe(
@@ -219,6 +334,10 @@ void main() {
         [soup, salad],
         estimateFor: store.calorieEstimateFor,
       );
+      final protein = store.estimateForRecipes(
+        [soup, salad],
+        estimateFor: store.proteinEstimateFor,
+      );
 
       // Soup: 3.25; Salad: 3*1.5 + missing Cheese → 4.5
       expect(cost.total, 7.75);
@@ -226,6 +345,9 @@ void main() {
       // Soup: 40; Salad: 3*20 + missing Cheese → 60
       expect(calories.total, 100);
       expect(calories.isComplete, isFalse);
+      // Soup: 4; Salad: 3*2 + missing Cheese → 6
+      expect(protein.total, 10);
+      expect(protein.isComplete, isTrue);
     });
   });
 }

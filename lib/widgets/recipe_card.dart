@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:nomnom/data/app_settings.dart';
 import 'package:nomnom/models/recipe.dart';
 import 'package:nomnom/theme/app_colors.dart';
 import 'package:nomnom/widgets/gradient_chip.dart';
@@ -20,6 +21,7 @@ class RecipeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final settings = AppSettingsScope.of(context);
     final colors = nomnomTheme(context);
     final titleStyle = GoogleFonts.antic(
       color: colors.text,
@@ -68,12 +70,23 @@ class RecipeCard extends StatelessWidget {
                       Text('Contains:', style: labelStyle),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: recipe.ingredients
-                              .map((i) => GradientChip(label: i.label))
-                              .toList(),
+                        child: ListenableBuilder(
+                          listenable: settings,
+                          builder: (context, _) {
+                            return Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: recipe.ingredients
+                                  .map(
+                                    (i) => GradientChip(
+                                      label: i.displayLabel(
+                                        settings.measurementSystem,
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                            );
+                          },
                         ),
                       ),
                     ],

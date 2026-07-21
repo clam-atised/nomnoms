@@ -1,7 +1,15 @@
+enum MeasurementSystem {
+  metric,
+  custom;
+}
+
 enum IngredientUnit {
   ml,
   cup,
+  eighthCup,
   quarterCup,
+  thirdCup,
+  halfCup,
   tsp,
   tbsp,
   g,
@@ -10,7 +18,10 @@ enum IngredientUnit {
   String get label => switch (this) {
         IngredientUnit.ml => 'ml',
         IngredientUnit.cup => 'cup',
+        IngredientUnit.eighthCup => '1/8 cup',
         IngredientUnit.quarterCup => '1/4 cup',
+        IngredientUnit.thirdCup => '1/3 cup',
+        IngredientUnit.halfCup => '1/2 cup',
         IngredientUnit.tsp => 'tsp',
         IngredientUnit.tbsp => 'tbsp',
         IngredientUnit.g => 'g',
@@ -24,6 +35,9 @@ class Ingredient {
     required this.name,
     this.unit,
   });
+
+  static const mlToFluidOunces = 0.034;
+  static const gToOunces = 0.035;
 
   final double quantity;
   final IngredientUnit? unit;
@@ -43,6 +57,22 @@ class Ingredient {
     final qty = formatQuantity(quantity);
     if (unit == null) return '$qty $name';
     return '$qty ${unit!.label} $name';
+  }
+
+  /// Display label for the active measurement system.
+  /// Custom converts ml → fluid ounces and g → ounces; other units unchanged.
+  String displayLabel(MeasurementSystem system) {
+    if (system == MeasurementSystem.metric || unit == null) {
+      return label;
+    }
+
+    return switch (unit!) {
+      IngredientUnit.ml =>
+        '${formatQuantity(quantity * mlToFluidOunces)} fluid ounces $name',
+      IngredientUnit.g =>
+        '${formatQuantity(quantity * gToOunces)} ounces $name',
+      _ => label,
+    };
   }
 }
 

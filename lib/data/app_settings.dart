@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:nomnom/data/hive_boxes.dart';
+import 'package:nomnom/models/recipe.dart';
 
 class AppSettings extends ChangeNotifier {
   bool _nightMode = false;
   bool _showCost = false;
   bool _showCalorie = false;
+  bool _showProtein = false;
+  MeasurementSystem _measurementSystem = MeasurementSystem.metric;
   bool _loaded = false;
 
   bool get nightMode => _nightMode;
   bool get showCost => _showCost;
   bool get showCalorie => _showCalorie;
+  bool get showProtein => _showProtein;
+  MeasurementSystem get measurementSystem => _measurementSystem;
   bool get isLoaded => _loaded;
 
   bool get _hiveReady => Hive.isBoxOpen(HiveBoxes.meta);
@@ -29,6 +34,13 @@ class AppSettings extends ChangeNotifier {
         metaBox.get(HiveBoxes.metaShowCost, defaultValue: false) as bool;
     _showCalorie =
         metaBox.get(HiveBoxes.metaShowCalorie, defaultValue: false) as bool;
+    _showProtein =
+        metaBox.get(HiveBoxes.metaShowProtein, defaultValue: false) as bool;
+    final systemName = metaBox.get(
+      HiveBoxes.metaMeasurementSystem,
+      defaultValue: MeasurementSystem.metric.name,
+    ) as String;
+    _measurementSystem = MeasurementSystem.values.byName(systemName);
 
     _loaded = true;
     notifyListeners();
@@ -59,6 +71,30 @@ class AppSettings extends ChangeNotifier {
       HiveBoxes.metaBox.put(HiveBoxes.metaShowCalorie, value);
     }
     notifyListeners();
+  }
+
+  void setShowProtein(bool value) {
+    if (_showProtein == value) return;
+    _showProtein = value;
+    if (_hiveReady) {
+      HiveBoxes.metaBox.put(HiveBoxes.metaShowProtein, value);
+    }
+    notifyListeners();
+  }
+
+  void setMeasurementSystem(MeasurementSystem value) {
+    if (_measurementSystem == value) return;
+    _measurementSystem = value;
+    if (_hiveReady) {
+      HiveBoxes.metaBox.put(HiveBoxes.metaMeasurementSystem, value.name);
+    }
+    notifyListeners();
+  }
+
+  void setCustomMeasuringSystem(bool enabled) {
+    setMeasurementSystem(
+      enabled ? MeasurementSystem.custom : MeasurementSystem.metric,
+    );
   }
 }
 

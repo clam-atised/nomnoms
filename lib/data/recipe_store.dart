@@ -15,6 +15,13 @@ class RecipeEstimate {
 
 class RecipeStore extends ChangeNotifier {
   static const String recentFolderId = 'recent';
+  static const String seedFolderMalaysianCuisine =
+      'seed_folder_malaysian_cuisine';
+  static const Set<String> seedRecipeIds = {
+    'seed_recipe_nasi_lemak',
+    'seed_recipe_tosai',
+    'seed_recipe_wat_tan_hor',
+  };
 
   RecipeStore() {
     _folders.add(
@@ -30,11 +37,40 @@ class RecipeStore extends ChangeNotifier {
   final List<Recipe> _recipes = [];
   final Map<String, double> _ingredientCosts = {};
   final Map<String, double> _ingredientCalories = {};
+  final Map<String, double> _ingredientProteins = {};
   int _nextId = 1;
   int _nextFolderId = 1;
   bool _loaded = false;
 
   bool get isLoaded => _loaded;
+
+  List<Recipe> get allRecipes => List.unmodifiable(_recipes);
+
+  Map<String, double> get ingredientCosts =>
+      Map.unmodifiable(_ingredientCosts);
+  Map<String, double> get ingredientCalories =>
+      Map.unmodifiable(_ingredientCalories);
+  Map<String, double> get ingredientProteins =>
+      Map.unmodifiable(_ingredientProteins);
+
+  int get nextRecipeIdCounter => _nextId;
+  int get nextFolderIdCounter => _nextFolderId;
+
+  /// True when the store has anything beyond the bundled seed set.
+  bool get hasUserData {
+    if (_ingredientCosts.isNotEmpty ||
+        _ingredientCalories.isNotEmpty ||
+        _ingredientProteins.isNotEmpty) {
+      return true;
+    }
+    if (_recipes.any((r) => !seedRecipeIds.contains(r.id))) {
+      return true;
+    }
+    return _folders.any(
+      (f) =>
+          f.id != recentFolderId && f.id != seedFolderMalaysianCuisine,
+    );
+  }
 
   bool get _hiveReady => Hive.isBoxOpen(HiveBoxes.folders);
 
@@ -49,6 +85,7 @@ class RecipeStore extends ChangeNotifier {
     final recipesBox = HiveBoxes.recipesBox;
     final costsBox = HiveBoxes.ingredientCostsBox;
     final caloriesBox = HiveBoxes.ingredientCaloriesBox;
+    final proteinsBox = HiveBoxes.ingredientProteinsBox;
     final metaBox = HiveBoxes.metaBox;
 
     _folders
@@ -83,6 +120,10 @@ class RecipeStore extends ChangeNotifier {
       ..clear()
       ..addAll(Map<String, double>.from(caloriesBox.toMap()));
 
+    _ingredientProteins
+      ..clear()
+      ..addAll(Map<String, double>.from(proteinsBox.toMap()));
+
     _nextId = metaBox.get(HiveBoxes.metaNextRecipeId, defaultValue: 1) as int;
     _nextFolderId =
         metaBox.get(HiveBoxes.metaNextFolderId, defaultValue: 1) as int;
@@ -108,7 +149,6 @@ class RecipeStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  static const _seedFolderMalaysianCuisine = 'seed_folder_malaysian_cuisine';
   static const _seedRecipeNasiLemak = 'seed_recipe_nasi_lemak';
   static const _seedRecipeTosai = 'seed_recipe_tosai';
   static const _seedRecipeWatTanHor = 'seed_recipe_wat_tan_hor';
@@ -128,7 +168,7 @@ class RecipeStore extends ChangeNotifier {
       if (needV1) {
         await _insertSeedFolder(
           seed,
-          id: _seedFolderMalaysianCuisine,
+          id: seedFolderMalaysianCuisine,
         );
         await _insertSeedRecipe(seed, id: _seedRecipeNasiLemak);
         await metaBox.put(HiveBoxes.metaSeedRecipesV1, true);
@@ -137,7 +177,7 @@ class RecipeStore extends ChangeNotifier {
       if (needV2) {
         await _insertSeedFolder(
           seed,
-          id: _seedFolderMalaysianCuisine,
+          id: seedFolderMalaysianCuisine,
         );
         await _insertSeedRecipe(seed, id: _seedRecipeTosai);
         await metaBox.put(HiveBoxes.metaSeedRecipesV2, true);
@@ -146,7 +186,7 @@ class RecipeStore extends ChangeNotifier {
       if (needV3) {
         await _insertSeedFolder(
           seed,
-          id: _seedFolderMalaysianCuisine,
+          id: seedFolderMalaysianCuisine,
         );
         await _insertSeedRecipe(seed, id: _seedRecipeWatTanHor);
         await metaBox.put(HiveBoxes.metaSeedRecipesV3, true);
@@ -255,6 +295,27 @@ class RecipeStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  double? proteinFor(String name) {
+    final key = normalizeIngredientName(name);
+    if (key.isEmpty) return null;
+    return _ingredientProteins[key];
+  }
+
+  void setIngredientProtein(String name, double? protein) {
+    final key = normalizeIngredientName(name);
+    if (key.isEmpty) return;
+
+    if (protein == null) {
+      if (!_ingredientProteins.containsKey(key)) return;
+      _ingredientProteins.remove(key);
+      if (_hiveReady) HiveBoxes.ingredientProteinsBox.delete(key);
+    } else {
+      _ingredientProteins[key] = protein;
+      if (_hiveReady) HiveBoxes.ingredientProteinsBox.put(key, protein);
+    }
+    notifyListeners();
+  }
+
   RecipeEstimate costEstimateFor(Recipe recipe) {
     return _estimateFor(
       recipe,
@@ -267,6 +328,23 @@ class RecipeStore extends ChangeNotifier {
       recipe,
       valueFor: calorieFor,
     );
+  }
+
+  /// Sums protein for ingredients that have a value; missing values are skipped
+  /// and the estimate is always treated as complete.
+  RecipeEstimate proteinEstimateFor(Recipe recipe) {
+    if (recipe.ingredients.isEmpty) {
+      return const RecipeEstimate(total: 0, isComplete: true);
+    }
+
+    var total = 0.0;
+    for (final ingredient in recipe.ingredients) {
+      final value = proteinFor(ingredient.name);
+      if (value != null) {
+        total += ingredient.quantity * value;
+      }
+    }
+    return RecipeEstimate(total: total, isComplete: true);
   }
 
   RecipeEstimate _estimateFor(
@@ -313,7 +391,8 @@ class RecipeStore extends ChangeNotifier {
     return value.toStringAsFixed(2);
   }
 
-  /// Sums [costEstimateFor] / [calorieEstimateFor] across [recipes].
+  /// Sums [costEstimateFor] / [calorieEstimateFor] / [proteinEstimateFor]
+  /// across [recipes].
   RecipeEstimate estimateForRecipes(
     Iterable<Recipe> recipes, {
     required RecipeEstimate Function(Recipe recipe) estimateFor,
@@ -485,6 +564,105 @@ class RecipeStore extends ChangeNotifier {
   }
 
   String nextRecipeId() => 'recipe_${_nextId++}';
+
+  /// Clears all recipes, assignable folders, and ingredient maps.
+  /// Keeps the virtual Recent folder and seed meta flags.
+  Future<void> clearAllData() async {
+    final folderIdsToDelete =
+        _folders.where((f) => f.id != recentFolderId).map((f) => f.id).toList();
+    final recipeIds = _recipes.map((r) => r.id).toList();
+
+    _folders.removeWhere((f) => f.id != recentFolderId);
+    _recipes.clear();
+    _ingredientCosts.clear();
+    _ingredientCalories.clear();
+    _ingredientProteins.clear();
+    _nextId = 1;
+    _nextFolderId = 1;
+
+    if (_hiveReady) {
+      final foldersBox = HiveBoxes.foldersBox;
+      final recipesBox = HiveBoxes.recipesBox;
+      for (final id in folderIdsToDelete) {
+        await foldersBox.delete(id);
+      }
+      for (final id in recipeIds) {
+        await recipesBox.delete(id);
+      }
+      await HiveBoxes.ingredientCostsBox.clear();
+      await HiveBoxes.ingredientCaloriesBox.clear();
+      await HiveBoxes.ingredientProteinsBox.clear();
+      await _persistMeta();
+    }
+
+    notifyListeners();
+  }
+
+  /// Full replace of folders, recipes, and ingredient maps from a backup.
+  Future<void> replaceFromBackup({
+    required List<RecipeFolder> folders,
+    required List<Recipe> recipes,
+    required Map<String, double> ingredientCosts,
+    required Map<String, double> ingredientCalories,
+    required Map<String, double> ingredientProteins,
+    required int nextRecipeId,
+    required int nextFolderId,
+  }) async {
+    final recent = const RecipeFolder(
+      id: recentFolderId,
+      name: 'Recent recipes',
+      color: kTextGreen,
+    );
+
+    final assignable = folders.where((f) => f.id != recentFolderId).toList();
+
+    _folders
+      ..clear()
+      ..add(recent)
+      ..addAll(assignable);
+    _recipes
+      ..clear()
+      ..addAll(recipes);
+    _ingredientCosts
+      ..clear()
+      ..addAll(ingredientCosts);
+    _ingredientCalories
+      ..clear()
+      ..addAll(ingredientCalories);
+    _ingredientProteins
+      ..clear()
+      ..addAll(ingredientProteins);
+    _nextId = nextRecipeId < 1 ? 1 : nextRecipeId;
+    _nextFolderId = nextFolderId < 1 ? 1 : nextFolderId;
+
+    if (_hiveReady) {
+      await HiveBoxes.foldersBox.clear();
+      await HiveBoxes.recipesBox.clear();
+      await HiveBoxes.ingredientCostsBox.clear();
+      await HiveBoxes.ingredientCaloriesBox.clear();
+      await HiveBoxes.ingredientProteinsBox.clear();
+
+      await HiveBoxes.foldersBox.put(recent.id, recent);
+      for (final folder in assignable) {
+        await HiveBoxes.foldersBox.put(folder.id, folder);
+      }
+      for (final recipe in recipes) {
+        await HiveBoxes.recipesBox.put(recipe.id, recipe);
+      }
+      for (final entry in ingredientCosts.entries) {
+        await HiveBoxes.ingredientCostsBox.put(entry.key, entry.value);
+      }
+      for (final entry in ingredientCalories.entries) {
+        await HiveBoxes.ingredientCaloriesBox.put(entry.key, entry.value);
+      }
+      for (final entry in ingredientProteins.entries) {
+        await HiveBoxes.ingredientProteinsBox.put(entry.key, entry.value);
+      }
+      await _persistMeta();
+    }
+
+    notifyListeners();
+  }
 }
 
 class RecipeStoreScope extends InheritedNotifier<RecipeStore> {

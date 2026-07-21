@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:nomnom/data/app_settings.dart';
 import 'package:nomnom/data/recipe_store.dart';
 import 'package:nomnom/models/recipe.dart';
 import 'package:nomnom/theme/app_colors.dart';
@@ -426,12 +427,21 @@ class _ViewRecipePageState extends State<ViewRecipePage> {
           SizedBox(height: 20),
           Text('Contains:', style: _labelStyle),
           SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: recipe.ingredients
-                .map((i) => GradientChip(label: i.label))
-                .toList(),
+          ListenableBuilder(
+            listenable: AppSettingsScope.of(context),
+            builder: (context, _) {
+              final system =
+                  AppSettingsScope.of(context).measurementSystem;
+              return Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: recipe.ingredients
+                    .map(
+                      (i) => GradientChip(label: i.displayLabel(system)),
+                    )
+                    .toList(),
+              );
+            },
           ),
           SizedBox(height: 20),
           Text(

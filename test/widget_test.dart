@@ -117,7 +117,7 @@ void main() {
     expect(find.text('MON'), findsNothing);
   });
 
-  testWidgets('Plan Week hides cost and calorie when toggles off', (
+  testWidgets('Plan Week hides cost, calorie, and protein when toggles off', (
     WidgetTester tester,
   ) async {
     final store = RecipeStore();
@@ -138,9 +138,10 @@ void main() {
 
     expect(find.text('Cost:'), findsNothing);
     expect(find.text('Calorie:'), findsNothing);
+    expect(find.text('Protein:'), findsNothing);
   });
 
-  testWidgets('Plan Week shows Cost and Calorie when toggles on', (
+  testWidgets('Plan Week shows Cost, Calorie, and Protein when toggles on', (
     WidgetTester tester,
   ) async {
     final store = RecipeStore();
@@ -156,20 +157,25 @@ void main() {
     );
     store.setIngredientCost('Eggs', 1.5);
     store.setIngredientCalorie('Eggs', 800);
+    store.setIngredientProtein('Eggs', 6);
 
     final settings = AppSettings();
     settings.setShowCost(true);
     settings.setShowCalorie(true);
+    settings.setShowProtein(true);
 
     await tester.pumpWidget(MyApp(store: store, settings: settings));
     await tester.tap(find.text('Plan week'));
     await tester.pumpAndSettle();
 
     // 7 days × 3 slots × (2 × 1.5) = 63; calories 7×3×1600 = 33600 → 33.6k
+    // protein 7×3×12 = 252
     expect(find.text('Cost:'), findsOneWidget);
     expect(find.text('63'), findsOneWidget);
     expect(find.text('Calorie:'), findsOneWidget);
     expect(find.text('33.6k'), findsOneWidget);
+    expect(find.text('Protein:'), findsOneWidget);
+    expect(find.text('252'), findsOneWidget);
   });
 
   testWidgets('Plan Week incomplete cost label shows info tooltip', (
@@ -296,7 +302,9 @@ void main() {
   }) async {
     final qtyField = find.byWidgetPredicate(
       (widget) =>
-          widget is TextField && widget.keyboardType == TextInputType.number,
+          widget is TextField &&
+          widget.keyboardType ==
+              const TextInputType.numberWithOptions(decimal: true),
     );
     await tester.enterText(qtyField.first, quantity);
     final addField = find.widgetWithText(TextField, 'Add..');
@@ -378,9 +386,9 @@ void main() {
 
     expect(find.text('cost'), findsOneWidget);
     expect(find.text('eggs'), findsOneWidget);
-    expect(find.text('price'), findsOneWidget);
+    expect(find.text('0'), findsOneWidget);
 
-    await tester.tap(find.text('price'));
+    await tester.tap(find.text('0'));
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField), '1.20');
@@ -388,7 +396,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('1.20'), findsOneWidget);
-    expect(find.text('price'), findsNothing);
+    expect(find.text('0'), findsNothing);
 
     await tester.tap(find.byIcon(Icons.info_outline));
     await tester.pumpAndSettle();
@@ -419,6 +427,25 @@ void main() {
 
     expect(find.text('52'), findsOneWidget);
 
+    // Switch to protein: unset values show 0; prior modes stay saved.
+    await tester.tap(find.byIcon(Icons.arrow_drop_down));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('protein').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('protein'), findsOneWidget);
+    expect(find.text('0'), findsWidgets);
+    expect(find.text('52'), findsNothing);
+    expect(find.text('1.20'), findsNothing);
+
+    await tester.tap(find.text('0').first);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '6');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('6'), findsOneWidget);
+
     await tester.tap(find.byIcon(Icons.arrow_drop_down));
     await tester.pumpAndSettle();
     await tester.tap(find.text('cost').last);
@@ -433,6 +460,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('52'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.arrow_drop_down));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('protein').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('6'), findsOneWidget);
   });
 
   testWidgets('View recipes shows only Recent recipes by default', (
@@ -618,7 +652,7 @@ void main() {
     expect(find.text('Recipe Name:'), findsOneWidget);
   });
 
-  testWidgets('Spin Wheel result hides cost and calories when toggles off', (
+  testWidgets('Spin Wheel result hides cost, calories, and protein when toggles off', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(MyApp());
@@ -629,6 +663,7 @@ void main() {
 
     expect(find.text('Cost'), findsNothing);
     expect(find.text('Calories'), findsNothing);
+    expect(find.text('Protein'), findsNothing);
   });
 
   testWidgets('Spin Wheel result shows estimated cost with info tooltip', (
@@ -668,7 +703,7 @@ void main() {
 
     await tester.tap(find.text('Calculate'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('price'));
+    await tester.tap(find.text('0'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), '1.20');
     await tester.tap(find.text('Save'));
@@ -753,7 +788,7 @@ void main() {
     );
   });
 
-  testWidgets('Spin Wheel result shows both cost and calories when enabled', (
+  testWidgets('Spin Wheel result shows cost, calories, and protein when enabled', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(MyApp());
@@ -762,10 +797,59 @@ void main() {
     await openSpinWheel(tester);
     await toggleSettingSwitch(tester, 1);
     await toggleSettingSwitch(tester, 2);
+    await toggleSettingSwitch(tester, 3);
     await spinWheelForMeringue(tester);
 
     expect(find.text('Cost'), findsOneWidget);
     expect(find.text('Calories'), findsOneWidget);
+    expect(find.text('Protein'), findsOneWidget);
+  });
+
+  testWidgets('Spin Wheel result shows protein without info icon', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(MyApp());
+    await createMeringueInDesserts(tester);
+    await navigateHomeFromRecipes(tester);
+
+    await tester.tap(find.text('Calculate'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.arrow_drop_down));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('protein').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('0').first);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '6');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.arrow_back));
+    await tester.pumpAndSettle();
+    await openSpinWheel(tester);
+    await toggleSettingSwitch(tester, 3);
+    await spinWheelForMeringue(tester);
+
+    expect(find.text('Protein'), findsOneWidget);
+    expect(find.text('6'), findsOneWidget);
+
+    final dialog = find.byType(AlertDialog);
+    expect(
+      find.descendant(of: dialog, matching: find.byIcon(Icons.info_outline)),
+      findsNothing,
+    );
+  });
+
+  testWidgets('Settings dialog includes Show Protein toggle', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(MyApp());
+    await tester.tap(find.byIcon(Icons.settings));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Show Cost'), findsOneWidget);
+    expect(find.text('Show Calorie'), findsOneWidget);
+    expect(find.text('Show Protein'), findsOneWidget);
   });
 
   testWidgets('Spin Wheel folder dropdown switches folders', (
