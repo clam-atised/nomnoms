@@ -6,10 +6,18 @@ import 'package:nomnom/models/recipe.dart';
 import 'package:nomnom/models/recipe_folder.dart';
 import 'package:nomnom/theme/app_colors.dart';
 import 'package:nomnom/widgets/gradient_chip.dart';
+import 'package:nomnom/widgets/plan_month_calendar.dart';
 
 Future<PlanCriterion?> showAddCriterionFlow(
   BuildContext context, {
   required bool allowFolder,
+  bool allowDaysOfWeek = false,
+  bool allowDaysOfMonth = false,
+  DaysOfWeekCriterion? existingDaysOfWeek,
+  PlanMonthDaysCriterion? existingMonthDays,
+  List<List<int?>>? monthWeeks,
+  int monthStartDay = 1,
+  int daysInMonth = 31,
   required RecipeStore store,
 }) async {
   final type = await showDialog<String>(
@@ -53,6 +61,22 @@ Future<PlanCriterion?> showAddCriterionFlow(
               ),
               onTap: () => Navigator.pop(context, 'repeat'),
             ),
+            if (allowDaysOfWeek)
+              ListTile(
+                title: Text(
+                  'Days of the week',
+                  style: GoogleFonts.antic(color: nomnomTheme(context).text),
+                ),
+                onTap: () => Navigator.pop(context, 'days'),
+              ),
+            if (allowDaysOfMonth)
+              ListTile(
+                title: Text(
+                  'Days of the month',
+                  style: GoogleFonts.antic(color: nomnomTheme(context).text),
+                ),
+                onTap: () => Navigator.pop(context, 'monthDays'),
+              ),
           ],
         ),
       );
@@ -66,6 +90,17 @@ Future<PlanCriterion?> showAddCriterionFlow(
     'contains' => _showContainsDialog(context, store),
     'folder' => _showFolderDialog(context, store),
     'repeat' => _showRepeatDialog(context, store),
+    'days' => _showDaysOfWeekDialog(
+        context,
+        initial: existingDaysOfWeek,
+      ),
+    'monthDays' => _showPlanMonthDaysDialog(
+        context,
+        initial: existingMonthDays,
+        weeks: monthWeeks ?? const [],
+        startDay: monthStartDay,
+        daysInMonth: daysInMonth,
+      ),
     _ => null,
   };
 }
@@ -476,6 +511,326 @@ class _RepeatDialogState extends State<_RepeatDialog> {
             );
           },
           child: Text('Add', style: GoogleFonts.antic(color: nomnomTheme(context).text)),
+        ),
+      ],
+    );
+  }
+}
+
+Future<PlanCriterion?> _showDaysOfWeekDialog(
+  BuildContext context, {
+  DaysOfWeekCriterion? initial,
+}) {
+  return showDialog<PlanCriterion>(
+    context: context,
+    builder: (context) => _DaysOfWeekDialog(initial: initial),
+  );
+}
+
+class _DaysOfWeekDialog extends StatefulWidget {
+  const _DaysOfWeekDialog({this.initial});
+
+  final DaysOfWeekCriterion? initial;
+
+  @override
+  State<_DaysOfWeekDialog> createState() => _DaysOfWeekDialogState();
+}
+
+class _DaysOfWeekDialogState extends State<_DaysOfWeekDialog> {
+  late final Map<DayOfWeekOption, Set<TimeOfDayOption>> _selectedByDay;
+
+  @override
+  void initState() {
+    super.initState();
+    final source =
+        widget.initial?.selectedByDay ?? DaysOfWeekCriterion.all().selectedByDay;
+    _selectedByDay = {
+      for (final day in DayOfWeekOption.values)
+        day: Set<TimeOfDayOption>.of(source[day] ?? const {}),
+    };
+  }
+
+  bool _dayEnabled(DayOfWeekOption day) =>
+      _selectedByDay[day]?.isNotEmpty ?? false;
+
+  bool _hasAnySelection() =>
+      _selectedByDay.values.any((slots) => slots.isNotEmpty);
+
+  void _toggleDay(DayOfWeekOption day, bool enabled) {
+    setState(() {
+      if (enabled) {
+        _selectedByDay[day] = {...TimeOfDayOption.values};
+      } else {
+        _selectedByDay[day] = {};
+      }
+    });
+  }
+
+  void _toggleSlot(DayOfWeekOption day, TimeOfDayOption time) {
+    if (!_dayEnabled(day)) return;
+    setState(() {
+      final slots = _selectedByDay[day]!;
+      if (slots.contains(time)) {
+        slots.remove(time);
+      } else {
+        slots.add(time);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = nomnomTheme(context);
+    final cellStyle = GoogleFonts.antic(color: theme.text, fontSize: 13);
+    final mutedStyle = GoogleFonts.antic(
+      color: theme.text.withValues(alpha: 0.4),
+      fontSize: 12,
+    );
+
+    return AlertDialog(
+      backgroundColor: theme.background,
+      title: Text(
+        'Days of the week',
+        style: GoogleFonts.antic(color: theme.text),
+      ),
+      content: SingleChildScrollView(
+        child: Table(
+          border: TableBorder.all(color: theme.text),
+          columnWidths: const {
+            0: FlexColumnWidth(1.6),
+            1: FlexColumnWidth(1.1),
+            2: FlexColumnWidth(1.1),
+            3: FlexColumnWidth(1.1),
+          },
+          children: [
+            for (final day in DayOfWeekOption.values)
+              TableRow(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: Row(
+                      children: [
+                        Checkbox(
+                          value: _dayEnabled(day),
+                          activeColor: theme.text,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                          onChanged: (checked) {
+                            _toggleDay(day, checked == true);
+                          },
+                        ),
+                        Expanded(
+                          child: Text(
+                            day.label,
+                            style: cellStyle,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  ...TimeOfDayOption.values.map((time) {
+                    final enabled = _dayEnabled(day);
+                    final selected =
+                        enabled && (_selectedByDay[day]?.contains(time) ?? false);
+                    return _MealSlotCell(
+                      label: time.label.toLowerCase(),
+                      selected: selected,
+                      enabled: enabled,
+                      selectedStyle: cellStyle.copyWith(fontSize: 12),
+                      mutedStyle: mutedStyle,
+                      onTap: () => _toggleSlot(day, time),
+                    );
+                  }),
+                ],
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(
+            'Cancel',
+            style: GoogleFonts.antic(color: theme.text),
+          ),
+        ),
+        TextButton(
+          onPressed: !_hasAnySelection()
+              ? null
+              : () {
+                  final result = <DayOfWeekOption, Set<TimeOfDayOption>>{};
+                  for (final entry in _selectedByDay.entries) {
+                    if (entry.value.isEmpty) continue;
+                    result[entry.key] = Set.of(entry.value);
+                  }
+                  Navigator.pop(
+                    context,
+                    DaysOfWeekCriterion(selectedByDay: result),
+                  );
+                },
+          child: Text(
+            widget.initial == null ? 'Add' : 'OK',
+            style: GoogleFonts.antic(color: theme.text),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MealSlotCell extends StatelessWidget {
+  const _MealSlotCell({
+    required this.label,
+    required this.selected,
+    required this.enabled,
+    required this.selectedStyle,
+    required this.mutedStyle,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final bool enabled;
+  final TextStyle selectedStyle;
+  final TextStyle mutedStyle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = nomnomTheme(context);
+    final fill = selected
+        ? theme.text.withValues(alpha: 0.18)
+        : Colors.transparent;
+
+    return Material(
+      color: fill,
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: selected ? selectedStyle : mutedStyle,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Future<PlanCriterion?> _showPlanMonthDaysDialog(
+  BuildContext context, {
+  PlanMonthDaysCriterion? initial,
+  required List<List<int?>> weeks,
+  required int startDay,
+  required int daysInMonth,
+}) {
+  return showDialog<PlanCriterion>(
+    context: context,
+    builder: (context) => _PlanMonthDaysDialog(
+      initial: initial,
+      weeks: weeks,
+      startDay: startDay,
+      daysInMonth: daysInMonth,
+    ),
+  );
+}
+
+class _PlanMonthDaysDialog extends StatefulWidget {
+  const _PlanMonthDaysDialog({
+    this.initial,
+    required this.weeks,
+    required this.startDay,
+    required this.daysInMonth,
+  });
+
+  final PlanMonthDaysCriterion? initial;
+  final List<List<int?>> weeks;
+  final int startDay;
+  final int daysInMonth;
+
+  @override
+  State<_PlanMonthDaysDialog> createState() => _PlanMonthDaysDialogState();
+}
+
+class _PlanMonthDaysDialogState extends State<_PlanMonthDaysDialog> {
+  late final Set<int> _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initial != null) {
+      _selected = Set.of(widget.initial!.selectedDays);
+    } else {
+      _selected = PlanMonthDaysCriterion.allEligible(
+        startDay: widget.startDay,
+        daysInMonth: widget.daysInMonth,
+      ).selectedDays;
+    }
+  }
+
+  void _toggleDay(int day) {
+    if (day < widget.startDay) return;
+    setState(() {
+      if (_selected.contains(day)) {
+        _selected.remove(day);
+      } else {
+        _selected.add(day);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = nomnomTheme(context);
+
+    return AlertDialog(
+      backgroundColor: theme.background,
+      title: Text(
+        'Days of the month',
+        style: GoogleFonts.antic(color: theme.text),
+      ),
+      content: SingleChildScrollView(
+        child: SizedBox(
+          width: double.maxFinite,
+          child: PlanMonthCalendar(
+            weeks: widget.weeks,
+            startDay: widget.startDay,
+            mode: PlanMonthCalendarMode.select,
+            selectedDays: _selected,
+            onDaySelected: _toggleDay,
+            cellHeight: 56,
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(
+            'Cancel',
+            style: GoogleFonts.antic(color: theme.text),
+          ),
+        ),
+        TextButton(
+          onPressed: _selected.isEmpty
+              ? null
+              : () {
+                  Navigator.pop(
+                    context,
+                    PlanMonthDaysCriterion(
+                      selectedDays: Set.of(_selected),
+                      startDay: widget.startDay,
+                      daysInMonth: widget.daysInMonth,
+                    ),
+                  );
+                },
+          child: Text(
+            widget.initial == null ? 'Add' : 'OK',
+            style: GoogleFonts.antic(color: theme.text),
+          ),
         ),
       ],
     );

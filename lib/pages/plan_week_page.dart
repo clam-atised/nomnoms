@@ -5,9 +5,11 @@ import 'package:nomnom/data/meal_plan_generator.dart';
 import 'package:nomnom/data/recipe_store.dart';
 import 'package:nomnom/models/plan_criterion.dart';
 import 'package:nomnom/models/recipe.dart';
+import 'package:nomnom/pages/view_recipe_page.dart';
 import 'package:nomnom/theme/app_colors.dart';
 import 'package:nomnom/widgets/add_criterion_sheet.dart';
 import 'package:nomnom/widgets/gradient_chip.dart';
+import 'package:nomnom/widgets/plan_month_calendar.dart';
 import 'package:nomnom/widgets/settings_dialog.dart';
 
 enum PlanMode { week, month }
@@ -22,15 +24,6 @@ class PlanWeekPage extends StatefulWidget {
 class _PlanWeekPageState extends State<PlanWeekPage> {
   static const _weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   static const _meals = ['Morning', 'Noon', 'Night'];
-  static const _monthHeaders = [
-    'MON',
-    'TUE',
-    'WED',
-    'THU',
-    'FRI',
-    'SAT',
-    'SUN',
-  ];
   static const _monthNames = [
     'January',
     'February',
@@ -135,12 +128,29 @@ class _PlanWeekPageState extends State<PlanWeekPage> {
     final pool =
         filterRecipesByCriteria(store.recentRecipes, _criteria);
 
-    final slots = _mode == PlanMode.week
+    var slots = _mode == PlanMode.week
         ? MealPlanGenerator.weekSlots()
         : MealPlanGenerator.monthSlots(
             startDay: _monthPlanStartDay,
             daysInMonth: _daysInMonth,
           );
+
+    if (_mode == PlanMode.week) {
+      final days = _criteria.whereType<DaysOfWeekCriterion>().firstOrNull;
+      if (days != null) {
+        slots = slots
+            .where(
+              (s) => days.includes(_weekdayForDayKey(s.$1), s.$2.timeOfDay),
+            )
+            .toList();
+      }
+    } else {
+      final monthDays =
+          _criteria.whereType<PlanMonthDaysCriterion>().firstOrNull;
+      if (monthDays != null) {
+        slots = slots.where((s) => monthDays.includes(s.$1)).toList();
+      }
+    }
 
     final repeats = _criteria.whereType<RepeatRecipeCriterion>().toList();
 
@@ -163,14 +173,109 @@ class _PlanWeekPageState extends State<PlanWeekPage> {
 
   Future<void> _addCriterion() async {
     final store = RecipeStoreScope.of(context);
+    final isMonth = _mode == PlanMode.month;
     final criterion = await showAddCriterionFlow(
       context,
       allowFolder: true,
+      allowDaysOfWeek: !isMonth,
+      allowDaysOfMonth: isMonth,
+      existingDaysOfWeek:
+          _criteria.whereType<DaysOfWeekCriterion>().firstOrNull,
+      existingMonthDays:
+          _criteria.whereType<PlanMonthDaysCriterion>().firstOrNull,
+      monthWeeks: isMonth ? _buildMonthWeeks() : null,
+      monthStartDay: _monthPlanStartDay,
+      daysInMonth: _daysInMonth,
       store: store,
     );
     if (!mounted || criterion == null) return;
-    setState(() => _criteria.add(criterion));
+    setState(() {
+      if (criterion is DaysOfWeekCriterion) {
+        _criteria.removeWhere((c) => c is DaysOfWeekCriterion);
+      }
+      if (criterion is PlanMonthDaysCriterion) {
+        _criteria.removeWhere((c) => c is PlanMonthDaysCriterion);
+      }
+      _criteria.add(criterion);
+    });
     _regeneratePlan();
+  }
+
+  bool _dayHasMeals(int day) {
+    return MealSlot.values.any((slot) => _assignments.containsKey((day, slot)));
+  }
+
+  Future<void> _showDayMealsDialog(int day) async {
+    final theme = nomnomTheme(context);
+    final store = RecipeStoreScope.of(context);
+    final titleStyle = GoogleFonts.antic(color: theme.text);
+    final labelStyle = GoogleFonts.antic(color: theme.text, fontSize: 16);
+    final mutedStyle = GoogleFonts.antic(
+      color: theme.text.withValues(alpha: 0.45),
+      fontSize: 16,
+    );
+    final linkStyle = GoogleFonts.antic(
+      color: theme.text,
+      fontSize: 16,
+      decoration: TextDecoration.underline,
+    );
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: theme.background,
+          title: Text('$_monthName $day', style: titleStyle),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final slot in MealSlot.values) ...[
+                if (slot != MealSlot.values.first) const SizedBox(height: 12),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 80,
+                      child: Text(slot.timeOfDay.label, style: labelStyle),
+                    ),
+                    Expanded(
+                      child: Builder(
+                        builder: (context) {
+                          final id = _assignments[(day, slot)];
+                          final recipe =
+                              id == null ? null : store.recipeById(id);
+                          if (recipe == null) {
+                            return Text('—', style: mutedStyle);
+                          }
+                          return InkWell(
+                            onTap: () {
+                              Navigator.of(dialogContext).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) =>
+                                      ViewRecipePage(recipeId: recipe.id),
+                                ),
+                              );
+                            },
+                            child: Text(recipe.name, style: linkStyle),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text('Close', style: titleStyle),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   List<Recipe> _assignedRecipes(RecipeStore store) {
@@ -308,14 +413,18 @@ class _PlanWeekPageState extends State<PlanWeekPage> {
                           value: PlanMode.week,
                           child: Text(
                             'Plan Week',
-                            style: GoogleFonts.antic(color: nomnomTheme(context).text),
+                            style: GoogleFonts.antic(
+                              color: nomnomTheme(context).text,
+                            ),
                           ),
                         ),
                         PopupMenuItem(
                           value: PlanMode.month,
                           child: Text(
                             _monthMenuLabel,
-                            style: GoogleFonts.antic(color: nomnomTheme(context).text),
+                            style: GoogleFonts.antic(
+                              color: nomnomTheme(context).text,
+                            ),
                           ),
                         ),
                       ],
@@ -354,7 +463,17 @@ class _PlanWeekPageState extends State<PlanWeekPage> {
               if (_mode == PlanMode.week)
                 _buildWeekTable(cellStyle, mealNameStyle)
               else
-                _buildMonthTable(cellStyle, mealNameStyle),
+                PlanMonthCalendar(
+                  weeks: _buildMonthWeeks(),
+                  startDay: _monthPlanStartDay,
+                  mode: PlanMonthCalendarMode.tap,
+                  mealLineFor: (day) => planMonthMealLines(
+                    day: day,
+                    recipeName: _recipeName,
+                  ),
+                  dayHasMeals: _dayHasMeals,
+                  onDayTap: _showDayMealsDialog,
+                ),
               SizedBox(height: 24),
               Row(
                 children: [
@@ -450,61 +569,6 @@ class _PlanWeekPageState extends State<PlanWeekPage> {
       ],
     );
   }
-
-  Widget _buildMonthTable(TextStyle cellStyle, TextStyle mealNameStyle) {
-    final weeks = _buildMonthWeeks();
-    final startDay = _monthPlanStartDay;
-
-    return Table(
-      border: TableBorder.all(color: nomnomTheme(context).text),
-      children: [
-        TableRow(
-          children: _monthHeaders
-              .map(
-                (header) => _MonthHeaderCell(
-                  child: Text(
-                    header,
-                    textAlign: TextAlign.center,
-                    style: cellStyle.copyWith(fontSize: 12),
-                  ),
-                ),
-              )
-              .toList(),
-        ),
-        ...weeks.map(
-          (week) => TableRow(
-            children: week.map((day) {
-              if (day == null) {
-                return const _MonthDayCell(child: SizedBox.shrink());
-              }
-
-              final showMeals = day >= startDay;
-              return _MonthDayCell(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('$day', style: cellStyle),
-                    if (showMeals) ...[
-                      const SizedBox(height: 2),
-                      ...MealSlot.values.map((slot) {
-                        final name = _recipeName(day, slot);
-                        return Text(
-                          '${slot.shortLabel} ${name ?? ''}',
-                          style: mealNameStyle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        );
-                      }),
-                    ],
-                  ],
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-      ],
-    );
-  }
 }
 
 class _PlanEstimateLabel extends StatelessWidget {
@@ -555,37 +619,6 @@ class _TableCell extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
       child: child,
-    );
-  }
-}
-
-class _MonthHeaderCell extends StatelessWidget {
-  const _MonthHeaderCell({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: child,
-    );
-  }
-}
-
-class _MonthDayCell extends StatelessWidget {
-  const _MonthDayCell({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 92,
-      child: Padding(
-        padding: const EdgeInsets.all(4),
-        child: child,
-      ),
     );
   }
 }

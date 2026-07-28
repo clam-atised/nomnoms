@@ -32,6 +32,8 @@ class _SpinWheelPageState extends State<SpinWheelPage>
   int? _pendingIndex;
   List<Recipe> _spinRecipes = [];
   late final AnimationController _hintBlinkController;
+  int _hintBlinkCount = 0;
+  static const _maxHintBlinks = 6;
 
   @override
   void initState() {
@@ -39,7 +41,34 @@ class _SpinWheelPageState extends State<SpinWheelPage>
     _hintBlinkController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
-    )..repeat(reverse: true);
+    )..addStatusListener(_onHintBlinkStatus);
+    _hintBlinkController.forward();
+  }
+
+  void _onHintBlinkStatus(AnimationStatus status) {
+    if (status != AnimationStatus.completed &&
+        status != AnimationStatus.dismissed) {
+      return;
+    }
+    _hintBlinkCount++;
+    if (_hintBlinkCount >= _maxHintBlinks) {
+      _hintBlinkController.stop();
+      _hintBlinkController.value = 1.0;
+      return;
+    }
+    if (status == AnimationStatus.completed) {
+      _hintBlinkController.reverse();
+    } else {
+      _hintBlinkController.forward();
+    }
+  }
+
+  void _restartHintBlink() {
+    _hintBlinkCount = 0;
+    _hintBlinkController
+      ..stop()
+      ..value = 0.0
+      ..forward();
   }
 
   @override
@@ -245,6 +274,7 @@ class _SpinWheelPageState extends State<SpinWheelPage>
                           _isSpinning = false;
                           _pendingIndex = null;
                         });
+                        _restartHintBlink();
                       },
                       color: nomnomTheme(context).background,
                       itemBuilder: (context) => [
@@ -283,6 +313,7 @@ class _SpinWheelPageState extends State<SpinWheelPage>
                         _isSpinning = false;
                         _pendingIndex = null;
                       });
+                      _restartHintBlink();
                     },
                     icon: Icon(Icons.refresh),
                     color: nomnomTheme(context).text,

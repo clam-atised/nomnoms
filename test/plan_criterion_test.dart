@@ -122,4 +122,90 @@ void main() {
       );
     });
   });
+
+  group('DaysOfWeekCriterion', () {
+    test('all() enables every day and meal time', () {
+      final criterion = DaysOfWeekCriterion.all();
+      expect(criterion.label, 'Days: Mon all, Tue all, Wed all, Thu all, Fri all, Sat all, Sun all');
+      for (final day in DayOfWeekOption.values) {
+        for (final time in TimeOfDayOption.values) {
+          expect(criterion.includes(day, time), isTrue);
+        }
+      }
+      expect(
+        criterion.matches(
+          _recipe(id: 'a', name: 'A', prep: 5, folderId: 'f'),
+        ),
+        isTrue,
+      );
+    });
+
+    test('includes only selected day/slot pairs', () {
+      final criterion = DaysOfWeekCriterion(
+        selectedByDay: {
+          DayOfWeekOption.monday: {
+            TimeOfDayOption.morning,
+            TimeOfDayOption.noon,
+            TimeOfDayOption.night,
+          },
+          DayOfWeekOption.tuesday: {TimeOfDayOption.morning},
+        },
+      );
+
+      expect(criterion.includes(DayOfWeekOption.monday, TimeOfDayOption.noon), isTrue);
+      expect(
+        criterion.includes(DayOfWeekOption.tuesday, TimeOfDayOption.morning),
+        isTrue,
+      );
+      expect(
+        criterion.includes(DayOfWeekOption.tuesday, TimeOfDayOption.noon),
+        isFalse,
+      );
+      expect(
+        criterion.includes(DayOfWeekOption.saturday, TimeOfDayOption.morning),
+        isFalse,
+      );
+      expect(criterion.label, 'Days: Mon all, Tue M');
+    });
+
+    test('empty selection labels as none', () {
+      final criterion = DaysOfWeekCriterion(selectedByDay: {});
+      expect(criterion.label, 'Days: none');
+    });
+  });
+
+  group('PlanMonthDaysCriterion', () {
+    test('allEligible selects every day in range', () {
+      final criterion = PlanMonthDaysCriterion.allEligible(
+        startDay: 5,
+        daysInMonth: 10,
+      );
+      expect(criterion.selectedDays, {5, 6, 7, 8, 9, 10});
+      expect(criterion.label, 'Days: all');
+      expect(criterion.includes(5), isTrue);
+      expect(criterion.includes(4), isFalse);
+      expect(
+        criterion.matches(
+          _recipe(id: 'a', name: 'A', prep: 5, folderId: 'f'),
+        ),
+        isTrue,
+      );
+    });
+
+    test('includes only selected days and formats label ranges', () {
+      final criterion = PlanMonthDaysCriterion(
+        selectedDays: {1, 3, 5, 6, 7, 8, 12, 28},
+        startDay: 1,
+        daysInMonth: 31,
+      );
+      expect(criterion.includes(3), isTrue);
+      expect(criterion.includes(2), isFalse);
+      expect(criterion.label, 'Days: 1, 3, 5–8, 12, 28');
+    });
+
+    test('empty selection labels as none', () {
+      final criterion = PlanMonthDaysCriterion(selectedDays: {});
+      expect(criterion.label, 'Days: none');
+    });
+  });
 }
